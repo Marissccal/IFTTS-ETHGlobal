@@ -1,0 +1,14 @@
+{
+    "include": ["types"],
+    "compilerOptions": {
+      "esModuleInterop": true,
+      "lib": ["dom", "es6"],
+      "module": "commonjs",
+      "moduleResolution": "node",
+      "noEmit": true,
+      "noUnusedLocals": true,
+      "resolveJsonModule": true,
+      "strict": true
+    }
+  }
+  
