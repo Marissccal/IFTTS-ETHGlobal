@@ -1,3 +1,6 @@
 broadcast/
 cache/
 out/
+lib/forge-std/*
+lib/openzeppelin-contracts/*
+lib/protocol/*
