@@ -16,8 +16,8 @@
       "contracts",
       "uma"
     ],
-    "nohoist": [
-      "**/@nomiclabs/**"
+    "nohoist": [      
+      "**/contracts/**"
     ]
   },
   "keywords": [],

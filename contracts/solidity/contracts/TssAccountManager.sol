@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.0;
 
-import {INodeRegistry} from "./interfaces/INodeRegistry.sol";
+import {INodeRegistry} from "../interfaces/INodeRegistry.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 contract TssAccountManager {
   INodeRegistry immutable _nodeRegistry;
@@ -136,7 +137,7 @@ contract TssAccountManager {
         _accounts[accountId].signersCount == s.length,
       "TssAccountManager: invalid signatures length"
     );
-    bytes32 message = ECDSA.toEthSignedMessageHash(abi.encodePacked(accountId, publicAddress));
+    bytes32 message = MessageHashUtils.toEthSignedMessageHash(abi.encodePacked(accountId, publicAddress));
 
     for (uint8 i = 0; i < _accounts[accountId].signersCount; i++) {
       address recoveredSigner = ECDSA.recover(message, v[i], r[i], s[i]);
