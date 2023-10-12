@@ -13,6 +13,7 @@ library Facts {
     ethEvent,
     ethCall,
     ethBalance,
+    ethNonce,
     ethBlock
   }
 
@@ -56,6 +57,16 @@ library Facts {
     uint16 minConfirmations;
   }
 
+  struct EthNonceFact {
+    uint32 chainId;
+    address account;
+    uint256 nonce;
+    bytes32 blockHash;
+    uint32 blockNumber;
+    uint40 timestamp;
+    uint16 minConfirmations;
+  }
+
   struct EthBlockFact {
     uint32 chainId;
     bytes32 blockHash;
@@ -65,24 +76,33 @@ library Facts {
     uint16 minConfirmations;
   }
 
-  function decodeEthEventFact(bytes memory data) internal pure returns (EthEventFact memory ret) {
-    (ret) = abi.decode(data, (EthEventFact));
+  function decodeEthEventFact(Fact memory fact) internal pure returns (EthEventFact memory ret) {
+    require(fact.fType == FactType.ethEvent, "Facts: invalid fact type");
+    (ret) = abi.decode(fact.data, (EthEventFact));
     return ret;
   }
 
-  function decodeEthCallFact(bytes memory data) internal pure returns (EthCallFact memory ret) {
-    (ret) = abi.decode(data, (EthCallFact));
+  function decodeEthCallFact(Fact memory fact) internal pure returns (EthCallFact memory ret) {
+    require(fact.fType == FactType.ethEvent, "Facts: invalid fact type");
+    (ret) = abi.decode(fact.data, (EthCallFact));
     return ret;
   }
 
-  function decodeEthBalanceFact(bytes memory data) internal pure returns (EthBalanceFact memory ret) {
-    (ret) = abi.decode(data, (EthBalanceFact));
+  function decodeEthBalanceFact(Fact memory fact) internal pure returns (EthBalanceFact memory ret) {
+    require(fact.fType == FactType.ethEvent, "Facts: invalid fact type");
+    (ret) = abi.decode(fact.data, (EthBalanceFact));
     return ret;
   }
 
-  function decodeEthBlockFact(bytes memory data) internal pure returns (EthBlockFact memory ret) {
-    (ret) = abi.decode(data, (EthBlockFact));
+  function decodeEthNonceFact(Fact memory fact) internal pure returns (EthNonceFact memory ret) {
+    require(fact.fType == FactType.ethEvent, "Facts: invalid fact type");
+    (ret) = abi.decode(fact.data, (EthNonceFact));
     return ret;
   }
 
+  function decodeEthBlockFact(Fact memory fact) internal pure returns (EthBlockFact memory ret) {
+    require(fact.fType == FactType.ethEvent, "Facts: invalid fact type");
+    (ret) = abi.decode(fact.data, (EthBlockFact));
+    return ret;
+  }
 }

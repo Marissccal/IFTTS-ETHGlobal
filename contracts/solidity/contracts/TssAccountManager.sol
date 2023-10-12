@@ -2,10 +2,14 @@
 pragma solidity ^0.8.0;
 
 import {INodeRegistry} from "../interfaces/INodeRegistry.sol";
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {Facts} from "./Facts.sol";
 
 contract TssAccountManager {
+  using Address for address;
+
   /**
    * @dev GRACE_TIME is the time we leave to the nodes before they know a rule has expired.
    */
@@ -14,7 +18,7 @@ contract TssAccountManager {
   INodeRegistry immutable _nodeRegistry;
 
   struct Rule {
-    address ruleContract;  // Address of the contract holding the code of the rule
+    address targetContract;  // Address of the contract holding the code of the rule
     bytes4 selector;  // Selector of the method to call
     bytes payload;  // First parameter to pass to the method (the 2nd one will be an array of facts)
     uint40 validFrom;  // Timestamp since when this rule is valid
@@ -89,7 +93,7 @@ contract TssAccountManager {
   }
 
   function _validateRule(Rule memory rule) internal view {
-    require(rule.ruleContract != address(0), "TssAccountManager: target contract can't be 0");
+    require(rule.targetContract != address(0), "TssAccountManager: target contract can't be 0");
     require(rule.validTo == 0 && rule.validTo >= block.timestamp + GRACE_TIME,
             "TssAccountManager: rule must be unbounded or expire after grace time");
     // TODO: other rule validations
@@ -186,5 +190,16 @@ contract TssAccountManager {
             "TssAccountManager: rule already expired");
     rule.validTo = uint40(block.timestamp) + GRACE_TIME;
     emit RuleExpired(accountId, ruleIndex, rule.validTo);
+  }
+
+  function messagesToSignFromFacts(bytes32 accountId, uint256 ruleIndex, Facts.Fact[] memory facts) external view returns (bytes[] memory messages){
+    Rule storage rule = _rules[accountId][ruleIndex];
+    require(rule.targetContract != address(0), "TssAccountManager: rule doesn't exists");
+    require(rule.validFrom <= block.timestamp, "TssAccountManager: rule is not active yet");
+    require(rule.validTo == 0 || rule.validTo >= block.timestamp, "TssAccountManager: rule has expired");
+    bytes memory result = rule.targetContract.functionStaticCall(
+      abi.encodeWithSelector(rule.selector, rule.payload, facts)
+    );
+    return abi.decode(result, (bytes[]));
   }
 }
