@@ -2,16 +2,27 @@
 pragma solidity ^0.8.0;
 
 import {INodeRegistry} from "../interfaces/INodeRegistry.sol";
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {Facts} from "./Facts.sol";
 
 contract TssAccountManager {
+  using Address for address;
+
+  /**
+   * @dev GRACE_TIME is the time we leave to the nodes before they know a rule has expired.
+   */
+  uint40 public constant GRACE_TIME = 3600;
+
   INodeRegistry immutable _nodeRegistry;
 
   struct Rule {
-    address ruleContract;
-    bytes4 selector;
-    bytes payload;
+    address targetContract;  // Address of the contract holding the code of the rule
+    bytes4 selector;  // Selector of the method to call
+    bytes payload;  // First parameter to pass to the method (the 2nd one will be an array of facts)
+    uint40 validFrom;  // Timestamp since when this rule is valid
+    uint40 validTo;  // Timestamp when this rule is no longer valid or 0 if unbounded.
   }
 
   /**
@@ -45,6 +56,7 @@ contract TssAccountManager {
     address signer
   );
   event NewRule(bytes32 indexed accountId, uint256 indexed index, Rule rule);
+  event RuleExpired(bytes32 indexed accountId, uint256 indexed index, uint40 validTo);
 
   constructor(INodeRegistry nodeRegistry_) {
     _nodeRegistry = nodeRegistry_;
@@ -74,9 +86,17 @@ contract TssAccountManager {
     });
     emit AccountCreated(accountId, signersCount_, threshold_);
     for (uint256 i = 0; i < rules.length; i++) {
+      _validateRule(rules[i]);
       _rules[accountId].push(rules[i]);
       emit NewRule(accountId, i, rules[i]);
     }
+  }
+
+  function _validateRule(Rule memory rule) internal view {
+    require(rule.targetContract != address(0), "TssAccountManager: target contract can't be 0");
+    require(rule.validTo == 0 && rule.validTo >= block.timestamp + GRACE_TIME,
+            "TssAccountManager: rule must be unbounded or expire after grace time");
+    // TODO: other rule validations
   }
 
   function registerSigner(
@@ -147,5 +167,39 @@ contract TssAccountManager {
       );
     }
     _accounts[accountId].publicAddress = publicAddress;
+
+    // sets validFrom for all the active rules
+    for (uint8 i = 0; i < _rules[accountId].length; i++) {
+      if (block.timestamp > _rules[accountId][i].validFrom) {
+        _rules[accountId][i].validFrom = uint40(block.timestamp);
+      }
+    }
+  }
+
+  function addRule(bytes32 accountId, Rule memory newRule) public {
+    require(_accounts[accountId].owner == msg.sender, "TssAccountManager: you must be the owner");
+    _validateRule(newRule);
+    _rules[accountId].push(newRule);
+    emit NewRule(accountId, _rules[accountId].length - 1, newRule);
+  }
+
+  function expireRule(bytes32 accountId, uint256 ruleIndex) public {
+    require(_accounts[accountId].owner == msg.sender, "TssAccountManager: you must be the owner");
+    Rule storage rule = _rules[accountId][ruleIndex];
+    require(rule.validTo == 0 && rule.validTo > block.timestamp + GRACE_TIME,
+            "TssAccountManager: rule already expired");
+    rule.validTo = uint40(block.timestamp) + GRACE_TIME;
+    emit RuleExpired(accountId, ruleIndex, rule.validTo);
+  }
+
+  function messagesToSignFromFacts(bytes32 accountId, uint256 ruleIndex, Facts.Fact[] memory facts) external view returns (bytes[] memory messages){
+    Rule storage rule = _rules[accountId][ruleIndex];
+    require(rule.targetContract != address(0), "TssAccountManager: rule doesn't exists");
+    require(rule.validFrom <= block.timestamp, "TssAccountManager: rule is not active yet");
+    require(rule.validTo == 0 || rule.validTo >= block.timestamp, "TssAccountManager: rule has expired");
+    bytes memory result = rule.targetContract.functionStaticCall(
+      abi.encodeWithSelector(rule.selector, rule.payload, facts)
+    );
+    return abi.decode(result, (bytes[]));
   }
 }
