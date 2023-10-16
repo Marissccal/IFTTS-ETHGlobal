@@ -6,5 +6,7 @@ pragma solidity ^0.8.0;
  * @dev Interface for the register of active nodes that can participate in the decentralized signature process.
  */
 interface INodeRegistry {
-  function isActive(address node) external view returns (bool);
+    function isActive(address node) external view returns (bool);
+    function registerNode(address node) external;
+    function deregisterNode(address node) external;
 }
