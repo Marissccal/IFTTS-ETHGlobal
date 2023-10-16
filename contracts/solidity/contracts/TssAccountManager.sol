@@ -14,6 +14,9 @@ contract TssAccountManager {
    * @dev GRACE_TIME is the time we leave to the nodes before they know a rule has expired.
    */
   uint40 public constant GRACE_TIME = 3600;
+  
+  uint8 private nonce = 0;
+  uint24 public createAccountFee = 1 ether;
 
   INodeRegistry immutable _nodeRegistry;
 
@@ -63,15 +66,19 @@ contract TssAccountManager {
   }
 
   function createAccount(
-    bytes32 accountId,
     uint8 signersCount_,
     uint8 threshold_,
     address owner_,
     Rule[] calldata rules
-  ) public {
+  ) public payable {
     // TODO: add somekind of whitelist or payment to create accounts
+    require(msg.value == createAccountFee, "TssAccountManager: Incorrect fee sent");
     require(_accounts[accountId].signersCount == 0, "TssAccountManager: Account already exists!");
-    // TODO: the accountId should be created in a pseudorandom way instead of received
+    
+    // TODO Generate a pseudorandom accountId using the sender's address, current block timestamp, and the nonce
+    bytes32 accountId = keccak256(abi.encodePacked(msg.sender, block.timestamp, nonce));
+    nonce++;
+
     require(
       signersCount_ > 0 && threshold_ > 0 && signersCount_ >= threshold_,
       "TssAccountManager: invalid threshold setup"
