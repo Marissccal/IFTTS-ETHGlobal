@@ -1,57 +1,175 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.0;
 
+import "@uma/core/contracts/optimistic-oracle-v3/implementation/OptimisticOracleV3.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+
 contract DisputeCourt {
+    using ECDSA for bytes32;
 
-    enum DisputeStatus { Open, Resolved, Rejected }
-
-    struct Dispute {
-        address complainant; // Address of the user who raised the dispute
-        address node; // Address of the node in question
-        string reason; // Reason for the dispute
-        DisputeStatus status; // Status of the dispute
+    enum DisputeType {
+        Type1,
+        Type2
+    }
+    enum DisputeState {
+        Raised,
+        Resolved,
+        Rejected
     }
 
-    Dispute[] public disputes;
+    struct Dispute {
+        DisputeType dtype;
+        DisputeState state;
+        address raiser;
+        bytes message;
+        bytes signature;
+        uint256 ruleNumber;
+        bytes[] facts;
+    }
 
-    event DisputeRaised(uint256 indexed disputeId, address indexed complainant, address indexed node, string reason);
-    event DisputeResolved(uint256 indexed disputeId);
-    event DisputeRejected(uint256 indexed disputeId);
+    OptimisticOracleV3 public oracle;
+    mapping(bytes32 => Dispute) public disputes;
 
-    function raiseDispute(address _node, string memory _reason) public returns (uint256) {
-        Dispute memory newDispute = Dispute({
-            complainant: msg.sender,
-            node: _node,
-            reason: _reason,
-            status: DisputeStatus.Open
+    constructor(address _oracle) {
+        oracle = OptimisticOracleV3(_oracle);
+    }
+
+    function raiseDisputeType1(
+        bytes memory message,
+        bytes memory signature
+    ) external returns (bytes32) {
+        bytes32 messageHash = toEthSignedMessageHash(abi.encodePacked(message));
+        address signer = messageHash.recover(signature);
+        //require(signer == msg.sender, "Invalid signature");
+
+        bytes32 disputeId = keccak256(
+            abi.encodePacked(msg.sender, message, block.timestamp)
+        );
+        disputes[disputeId] = Dispute({
+            dtype: DisputeType.Type1,
+            state: DisputeState.Raised,
+            raiser: msg.sender,
+            message: message,
+            signature: signature,
+            ruleNumber: 0,
+            facts: new bytes[](0)
+            //timestamp: block.timestamp
         });
-
-        disputes.push(newDispute);
-        uint256 disputeId = disputes.length - 1;
-        emit DisputeRaised(disputeId, msg.sender, _node, _reason);
         return disputeId;
     }
 
-    function resolveDispute(uint256 _disputeId) public {
-        // Add multisignature exucution??
-        require(disputes[_disputeId].status == DisputeStatus.Open, "Dispute is not open");
-        disputes[_disputeId].status = DisputeStatus.Resolved;
-        emit DisputeResolved(_disputeId);
+    function raiseDisputeType2(
+        bytes memory message,
+        bytes memory signature,
+        uint256 ruleNumber,
+        bytes[] memory facts
+    ) external returns (bytes32) {
+        bytes32 messageHash = toEthSignedMessageHash(abi.encodePacked(message));
+        address signer = messageHash.recover(signature);
+        //require(signer == msg.sender, "Invalid signature");
+
+        // TODO: Add logic to validate that the rule and facts produce the message
+
+        bytes32 disputeId = keccak256(
+            abi.encodePacked(msg.sender, message, ruleNumber, block.timestamp)
+        );
+        disputes[disputeId] = Dispute({
+            dtype: DisputeType.Type2,
+            state: DisputeState.Raised,
+            raiser: msg.sender,
+            message: message,
+            signature: signature,
+            ruleNumber: ruleNumber,
+            facts: facts
+            //timestamp: block.timestamp
+        });
+              return disputeId;
     }
 
-    function rejectDispute(uint256 _disputeId) public {
-       // Add multisignature exucution??
-        require(disputes[_disputeId].status == DisputeStatus.Open, "Dispute is not open");
-        disputes[_disputeId].status = DisputeStatus.Rejected;
-        emit DisputeRejected(_disputeId);
+    function getDisputeDetails(
+        bytes32 disputeId
+    )
+        external
+        view
+        returns (
+            DisputeType dtype,
+            DisputeState state,
+            address raiser,
+            bytes memory message,
+            bytes memory signature,
+            uint256 ruleNumber,
+            bytes[] memory facts
+        )
+    {
+        Dispute storage dispute = disputes[disputeId];
+        dtype = dispute.dtype;
+        state = dispute.state;
+        raiser = dispute.raiser;
+        message = dispute.message;
+        signature = dispute.signature;
+        ruleNumber = dispute.ruleNumber;
+        facts = dispute.facts;
+    }
+
+    function getDispute(
+        bytes32 disputeId
+    )
+        external
+        view
+        returns (
+            DisputeType dtype,
+            DisputeState state,
+            address raiser,
+            bytes memory message,
+            bytes memory signature,
+            uint256 ruleNumber,
+            bytes[] memory facts
+        )
+    {
+        Dispute storage dispute = disputes[disputeId];
+        dtype = dispute.dtype;
+        state = dispute.state;
+        raiser = dispute.raiser;
+        message = dispute.message;
+        signature = dispute.signature;
+        ruleNumber = dispute.ruleNumber;
+        facts = dispute.facts;
+    }
+
+    function resolveDispute(bytes32 disputeId) external {
+        Dispute storage dispute = disputes[disputeId];
+        require(
+            dispute.state == DisputeState.Raised,
+            "Dispute not in Raised state"
+        );
+        
+        bool result = oracle.settleAndGetAssertionResult(disputeId);
+        if (result) {
+            dispute.state = DisputeState.Resolved;
+        } else {
+            dispute.state = DisputeState.Rejected;
+        }
+    }
+
+    function rejectDispute(bytes32 disputeId) external {
+        Dispute storage dispute = disputes[disputeId];
+        require(
+            dispute.state == DisputeState.Raised,
+            "Dispute not in Raised state"
+        );
+        
+        dispute.state = DisputeState.Rejected;
+    }
+
+    function toEthSignedMessageHash(
+        bytes memory _message
+    ) internal pure returns (bytes32) {
+        return
+            keccak256(
+                abi.encodePacked(
+                    "\x19Ethereum Signed Message:\n32",
+                    keccak256(_message)
+                )
+            );
     }
 }
-
-
-//   add
-
-// Evidence Submission: Allow users to submit evidence when raising a dispute and during the dispute resolution process.
-
-// Voting Mechanism: Implement a voting mechanism where multiple judges can vote on the outcome of a dispute.
-
-// Penalties: Implement penalties for nodes found guilty. For instance, they could be removed from the active node list or fined.
