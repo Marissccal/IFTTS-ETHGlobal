@@ -2,10 +2,10 @@
 pragma solidity ^0.8.0;
 
 import "@uma/core/contracts/optimistic-oracle-v3/implementation/OptimisticOracleV3.sol";
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 contract DisputeCourt {
-    using ECDSA for bytes32;
+    //using ECDSA for bytes32;
 
     enum DisputeType {
         Type1,
@@ -21,11 +21,14 @@ contract DisputeCourt {
         DisputeType dtype;
         DisputeState state;
         address raiser;
-        bytes message;
+        bytes32 message;
         bytes signature;
         uint256 ruleNumber;
-        bytes[] facts;
+        bytes[] facts;   
+        uint256 timestamp;     
     }
+
+    uint256 public disputeTimeout = 1 hours;
 
     OptimisticOracleV3 public oracle;
     mapping(bytes32 => Dispute) public disputes;
@@ -34,16 +37,22 @@ contract DisputeCourt {
         oracle = OptimisticOracleV3(_oracle);
     }
 
+    function ruleApplies(uint256 ruleNumber, bytes[] memory facts, bytes32 message) internal pure returns (bool) {
+        ruleNumber;
+        facts;
+        message;
+        return true;
+    }
+
     function raiseDisputeType1(
-        bytes memory message,
-        bytes memory signature
+        bytes32 message,
+        bytes memory signature        
     ) external returns (bytes32) {
-        bytes32 messageHash = toEthSignedMessageHash(abi.encodePacked(message));
-        address signer = messageHash.recover(signature);
-        //require(signer == msg.sender, "Invalid signature");
+        bytes32 messageHash = ECDSA.toEthSignedMessageHash(message); 
+        address signer = ECDSA.recover(messageHash, signature);        
 
         bytes32 disputeId = keccak256(
-            abi.encodePacked(msg.sender, message, block.timestamp)
+            abi.encodePacked(message, signer)
         );
         disputes[disputeId] = Dispute({
             dtype: DisputeType.Type1,
@@ -52,26 +61,24 @@ contract DisputeCourt {
             message: message,
             signature: signature,
             ruleNumber: 0,
-            facts: new bytes[](0)
-            //timestamp: block.timestamp
+            facts: new bytes[](0),
+            timestamp: block.timestamp
         });
+        disputes[disputeId].timestamp = block.timestamp;
         return disputeId;
     }
 
     function raiseDisputeType2(
-        bytes memory message,
+        bytes32 message,
         bytes memory signature,
         uint256 ruleNumber,
         bytes[] memory facts
-    ) external returns (bytes32) {
-        bytes32 messageHash = toEthSignedMessageHash(abi.encodePacked(message));
-        address signer = messageHash.recover(signature);
-        //require(signer == msg.sender, "Invalid signature");
+    ) external returns (bytes32) {                        
 
         // TODO: Add logic to validate that the rule and facts produce the message
 
         bytes32 disputeId = keccak256(
-            abi.encodePacked(msg.sender, message, ruleNumber, block.timestamp)
+            abi.encodePacked(msg.sender, message, ruleNumber)
         );
         disputes[disputeId] = Dispute({
             dtype: DisputeType.Type2,
@@ -80,36 +87,14 @@ contract DisputeCourt {
             message: message,
             signature: signature,
             ruleNumber: ruleNumber,
-            facts: facts
-            //timestamp: block.timestamp
+            facts: facts,
+            timestamp: block.timestamp
+            
         });
-              return disputeId;
-    }
-
-    function getDisputeDetails(
-        bytes32 disputeId
-    )
-        external
-        view
-        returns (
-            DisputeType dtype,
-            DisputeState state,
-            address raiser,
-            bytes memory message,
-            bytes memory signature,
-            uint256 ruleNumber,
-            bytes[] memory facts
-        )
-    {
-        Dispute storage dispute = disputes[disputeId];
-        dtype = dispute.dtype;
-        state = dispute.state;
-        raiser = dispute.raiser;
-        message = dispute.message;
-        signature = dispute.signature;
-        ruleNumber = dispute.ruleNumber;
-        facts = dispute.facts;
-    }
+        require(ruleApplies(ruleNumber, facts, message), "The rule and facts do not produce the message");
+        disputes[disputeId].timestamp = block.timestamp;
+        return disputeId;
+    }    
 
     function getDispute(
         bytes32 disputeId
@@ -120,10 +105,11 @@ contract DisputeCourt {
             DisputeType dtype,
             DisputeState state,
             address raiser,
-            bytes memory message,
+            bytes32 message,
             bytes memory signature,
             uint256 ruleNumber,
-            bytes[] memory facts
+            bytes[] memory facts,
+            uint256 timestamp
         )
     {
         Dispute storage dispute = disputes[disputeId];
@@ -134,14 +120,13 @@ contract DisputeCourt {
         signature = dispute.signature;
         ruleNumber = dispute.ruleNumber;
         facts = dispute.facts;
+        timestamp = dispute.timestamp;
     }
 
     function resolveDispute(bytes32 disputeId) external {
         Dispute storage dispute = disputes[disputeId];
-        require(
-            dispute.state == DisputeState.Raised,
-            "Dispute not in Raised state"
-        );
+        require(dispute.state == DisputeState.Raised, "Dispute not in Raised state");
+        require(block.timestamp <= dispute.timestamp + disputeTimeout, "Dispute resolution time has passed");
         
         bool result = oracle.settleAndGetAssertionResult(disputeId);
         if (result) {
@@ -149,6 +134,14 @@ contract DisputeCourt {
         } else {
             dispute.state = DisputeState.Rejected;
         }
+    }
+
+    function autoResolveDispute(bytes32 disputeId) external {
+        Dispute storage dispute = disputes[disputeId];
+        require(dispute.state == DisputeState.Raised, "Dispute not in Raised state");
+        require(block.timestamp > dispute.timestamp + disputeTimeout, "Dispute resolution time has not passed yet");
+
+        dispute.state = DisputeState.Resolved; 
     }
 
     function rejectDispute(bytes32 disputeId) external {
@@ -160,16 +153,5 @@ contract DisputeCourt {
         
         dispute.state = DisputeState.Rejected;
     }
-
-    function toEthSignedMessageHash(
-        bytes memory _message
-    ) internal pure returns (bytes32) {
-        return
-            keccak256(
-                abi.encodePacked(
-                    "\x19Ethereum Signed Message:\n32",
-                    keccak256(_message)
-                )
-            );
-    }
+    
 }

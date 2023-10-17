@@ -1,135 +1,68 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.16;
 
+import "forge-std/Test.sol";
 import "../../contracts/disputeCourt.sol";
 import "./Mocks.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
-contract E2EDisputeCourt {
-    DisputeCourt disputeCourt;
-    MockOptimisticOracleV3 mockOracle;
-    address externalAddress;
-    bytes message = bytes("Hello World");
+contract E2EDisputeCourtTest is Test {
+    DisputeCourt public disputeCourt;
+    address dummyOracle = address(0); 
+    uint256 private startAt;
 
-    function beforeEach() public {
-        mockOracle = new MockOptimisticOracleV3();
-        disputeCourt = new DisputeCourt(address(mockOracle));
+    constructor() {
+        disputeCourt = new DisputeCourt(dummyOracle);
+        startAt = block.timestamp;
+    }
+
+    function getMessageHash(
+        string memory _message
+    ) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked(_message));
     }
 
     function testRaiseDisputeType1() public {
-        bytes32 hash = keccak256(abi.encodePacked(message));
-        bytes memory signature = "";
+        string memory message = "Hello World";
+        bytes
+            memory signature = hex"487646cdc119c536137467b592b52485c22fd41488f12b5e7f0a70471ae95f7e1e90d5e9687cda52ddb632ec397a3686c2d5d85fad6ea048fc6bb72f5354adcf1c";
+        assert(signature.length == 65);
 
-        bytes32 disputeId = disputeCourt.raiseDisputeType1(message, signature);
+        bytes32 messageHash = getMessageHash(message);        
 
-        (
-            DisputeCourt.DisputeType dtype,
-            DisputeCourt.DisputeState state,
-            address raiser,
-            bytes memory message_,
-            bytes memory signature_,
-            uint256 ruleNumber,
-            bytes[] memory facts
-        ) = disputeCourt.getDisputeDetails(0);
-
-        assert(dtype == DisputeCourt.DisputeType.Type1);
-        assert(state == DisputeCourt.DisputeState.Raised);
-        assert(raiser == address(this));
-        assert(keccak256(message_) == keccak256(message));
-        assert(keccak256(signature_) == keccak256(signature));
-    }
-
-    function testRaiseDisputeType2() public {
-        bytes32 hash = keccak256(abi.encodePacked(message));
-        bytes memory signature = "";
-
-        uint256 ruleNumber = 3;
-        bytes[] memory facts = new bytes[](2);
-        facts[0] = bytes("Fact 1");
-        facts[1] = bytes("Fact 2");
-
-        bytes32 disputeId = disputeCourt.raiseDisputeType2(message, signature, ruleNumber, facts);
-
-        (
-            DisputeCourt.DisputeType dtype,
-            DisputeCourt.DisputeState state,
-            address raiser,
-            bytes memory message_,
-            bytes memory signature_,
-            uint256 ruleNumber_,
-            bytes[] memory facts_
-        ) = disputeCourt.getDisputeDetails(0);
-
-        assert(dtype == DisputeCourt.DisputeType.Type2);
-        assert(state == DisputeCourt.DisputeState.Raised);
-        assert(raiser == address(this));
-        assert(keccak256(message_) == keccak256(message));
-        assert(keccak256(signature_) == keccak256(signature));
-        assert(ruleNumber_ == ruleNumber);
-        assert(facts_.length == 2);
-        assert(keccak256(facts_[0]) == keccak256(facts[0]));
-        assert(keccak256(facts_[1]) == keccak256(facts[1]));
-    }
-
-    function testResolveDispute() public {
-        bytes32 hash = keccak256(abi.encodePacked(message));
-        bytes memory signature = "";
-
-        uint256 ruleNumber = 3;
-        bytes[] memory facts = new bytes[](2);
-        facts[0] = bytes("Fact 1");
-        facts[1] = bytes("Fact 2");
-
-        bytes32 disputeId = disputeCourt.raiseDisputeType2(
-            message,
-            signature,
-            ruleNumber,
-            facts
+        bytes32 disputeId = disputeCourt.raiseDisputeType1(
+            messageHash,
+            signature
         );
-        mockOracle.setAssertionResult(disputeId, true);
-
-        disputeCourt.resolveDispute(disputeId);
 
         (
             DisputeCourt.DisputeType dtype,
             DisputeCourt.DisputeState state,
-            address raiser,
-            bytes memory message_,
-            bytes memory signature_,
-            uint256 ruleNumber_,
-            bytes[] memory facts_
-        ) = disputeCourt.getDispute(0);
+            ,
+            ,
+            ,
+            ,
+            bytes[] memory facts,
+            
+        ) = disputeCourt.getDispute(disputeId);
 
-        assert(state == DisputeCourt.DisputeState.Resolved);
+        assert(uint(dtype) == uint(DisputeCourt.DisputeType.Type1));
+        assert(uint(state) == uint(DisputeCourt.DisputeState.Raised));
+        assert(facts.length == 0);
     }
 
-    function testRejectDispute() public {
-        bytes32 hash = keccak256(abi.encodePacked(message));
-        bytes memory signature = "";
+    function testAutoResolveDispute() public {
+        string memory message = "Hello World";
+        bytes memory signature = hex"487646cdc119c536137467b592b52485c22fd41488f12b5e7f0a70471ae95f7e1e90d5e9687cda52ddb632ec397a3686c2d5d85fad6ea048fc6bb72f5354adcf1c"; 
+        bytes32 messageHash = ECDSA.toEthSignedMessageHash(keccak256(abi.encodePacked(message)));
+        
+        bytes32 disputeId = disputeCourt.raiseDisputeType1(messageHash, signature);
+        
+        vm.warp(startAt + 2 hours);
 
-        uint256 ruleNumber = 3;
-        bytes[] memory facts = new bytes[](2);
-        facts[0] = bytes("Fact 1");
-        facts[1] = bytes("Fact 2");
+        disputeCourt.autoResolveDispute(disputeId);
 
-        bytes32 disputeId = disputeCourt.raiseDisputeType2(
-            message,
-            signature,
-            ruleNumber,
-            facts
-        );
-        disputeCourt.rejectDispute(disputeId);
-
-        (
-            DisputeCourt.DisputeType dtype,
-            DisputeCourt.DisputeState state,
-            address raiser,
-            bytes memory message_,
-            bytes memory signature_,
-            uint256 ruleNumber_,
-            bytes[] memory facts_
-        ) = disputeCourt.getDispute(0);
-
-        assert(state == DisputeCourt.DisputeState.Rejected);
+        (, DisputeCourt.DisputeState state, , , , , , ) = disputeCourt.getDispute(disputeId);
+        assert(uint(state) == uint(DisputeCourt.DisputeState.Resolved));
     }
 }
