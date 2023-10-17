@@ -9,14 +9,13 @@ pragma solidity ^0.8.0;
  */
 library Facts {
   enum FactType {
-    unknown,  // To skip uint(FactType) ==  0
+    unknown, // To skip uint(FactType) ==  0
     ethEvent,
     ethCall,
     ethBalance,
     ethNonce,
     ethBlock
   }
-
 
   struct Fact {
     FactType fType;
@@ -77,31 +76,31 @@ library Facts {
   }
 
   function decodeEthEventFact(Fact memory fact) internal pure returns (EthEventFact memory ret) {
-    require(fact.fType == FactType.ethEvent, "Facts: invalid fact type");
+    require(fact.fType == FactType.ethEvent, 'Facts: invalid fact type');
     (ret) = abi.decode(fact.data, (EthEventFact));
     return ret;
   }
 
   function decodeEthCallFact(Fact memory fact) internal pure returns (EthCallFact memory ret) {
-    require(fact.fType == FactType.ethEvent, "Facts: invalid fact type");
+    require(fact.fType == FactType.ethEvent, 'Facts: invalid fact type');
     (ret) = abi.decode(fact.data, (EthCallFact));
     return ret;
   }
 
   function decodeEthBalanceFact(Fact memory fact) internal pure returns (EthBalanceFact memory ret) {
-    require(fact.fType == FactType.ethEvent, "Facts: invalid fact type");
+    require(fact.fType == FactType.ethEvent, 'Facts: invalid fact type');
     (ret) = abi.decode(fact.data, (EthBalanceFact));
     return ret;
   }
 
   function decodeEthNonceFact(Fact memory fact) internal pure returns (EthNonceFact memory ret) {
-    require(fact.fType == FactType.ethEvent, "Facts: invalid fact type");
+    require(fact.fType == FactType.ethEvent, 'Facts: invalid fact type');
     (ret) = abi.decode(fact.data, (EthNonceFact));
     return ret;
   }
 
   function decodeEthBlockFact(Fact memory fact) internal pure returns (EthBlockFact memory ret) {
-    require(fact.fType == FactType.ethEvent, "Facts: invalid fact type");
+    require(fact.fType == FactType.ethEvent, 'Facts: invalid fact type');
     (ret) = abi.decode(fact.data, (EthBlockFact));
     return ret;
   }

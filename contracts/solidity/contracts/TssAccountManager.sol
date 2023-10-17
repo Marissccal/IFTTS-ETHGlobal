@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.0;
 
-import {INodeRegistry} from "../interfaces/INodeRegistry.sol";
-import {ITssAccountManager} from "../interfaces/ITssAccountManager.sol";
-import {Address} from "@openzeppelin/contracts/utils/Address.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import {Facts} from "./Facts.sol";
+import {INodeRegistry} from '../interfaces/INodeRegistry.sol';
+import {ITssAccountManager} from '../interfaces/ITssAccountManager.sol';
+import {Address} from '@openzeppelin/contracts/utils/Address.sol';
+import {ECDSA} from '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
+import {MessageHashUtils} from '@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol';
+import {Facts} from './Facts.sol';
 
 contract TssAccountManager is ITssAccountManager {
   using Address for address;
@@ -22,11 +22,11 @@ contract TssAccountManager is ITssAccountManager {
   INodeRegistry immutable _nodeRegistry;
 
   struct Rule {
-    address targetContract;  // Address of the contract holding the code of the rule
-    bytes4 selector;  // Selector of the method to call
-    bytes payload;  // First parameter to pass to the method (the 2nd one will be an array of facts)
-    uint40 validFrom;  // Timestamp since when this rule is valid
-    uint40 validTo;  // Timestamp when this rule is no longer valid or 0 if unbounded.
+    address targetContract; // Address of the contract holding the code of the rule
+    bytes4 selector; // Selector of the method to call
+    bytes payload; // First parameter to pass to the method (the 2nd one will be an array of facts)
+    uint40 validFrom; // Timestamp since when this rule is valid
+    uint40 validTo; // Timestamp when this rule is no longer valid or 0 if unbounded.
   }
 
   /**
@@ -53,12 +53,7 @@ contract TssAccountManager is ITssAccountManager {
   event AccountCreated(bytes32 indexed accountId, uint8 signersCount, uint8 threshold);
   event AccountSignersReady(bytes32 indexed accountId, uint8 signersCount, address[] signers);
   event AccountReady(bytes32 indexed accountId, address indexed publicAddress);
-  event AccountNewSigner(
-    bytes32 indexed accountId,
-    address indexed node,
-    uint8 signerIndex,
-    address signer
-  );
+  event AccountNewSigner(bytes32 indexed accountId, address indexed node, uint8 signerIndex, address signer);
   event NewRule(bytes32 indexed accountId, uint256 indexed index, Rule rule);
   event RuleExpired(bytes32 indexed accountId, uint256 indexed index, uint40 validTo);
 
@@ -72,15 +67,14 @@ contract TssAccountManager is ITssAccountManager {
     address owner_,
     Rule[] memory rules
   ) public payable returns (bytes32 accountId) {
-    require(msg.value == createAccountFee, "TssAccountManager: Incorrect fee sent");
+    require(msg.value == createAccountFee, 'TssAccountManager: Incorrect fee sent');
 
     accountId = keccak256(abi.encodePacked(msg.sender, block.timestamp, nonce));
-    require(_accounts[accountId].signersCount == 0, "TssAccountManager: Account already exists!");
+    require(_accounts[accountId].signersCount == 0, 'TssAccountManager: Account already exists!');
     nonce++;
 
     require(
-      signersCount_ > 0 && threshold_ > 0 && signersCount_ >= threshold_,
-      "TssAccountManager: invalid threshold setup"
+      signersCount_ > 0 && threshold_ > 0 && signersCount_ >= threshold_, 'TssAccountManager: invalid threshold setup'
     );
     _accounts[accountId] = Account({
       publicAddress: address(0),
@@ -101,34 +95,23 @@ contract TssAccountManager is ITssAccountManager {
 
   function _validateRule(Rule memory rule) internal view {
     require(rule.targetContract != address(0), "TssAccountManager: target contract can't be 0");
-    require(rule.validTo == 0 && rule.validTo >= block.timestamp + GRACE_TIME,
-            "TssAccountManager: rule must be unbounded or expire after grace time");
+    require(
+      rule.validTo == 0 && rule.validTo >= block.timestamp + GRACE_TIME,
+      'TssAccountManager: rule must be unbounded or expire after grace time'
+    );
     // TODO: other rule validations
   }
 
-  function registerSigner(
-    bytes32 accountId,
-    uint8 signerIndex,
-    address signerAddress
-  ) public {
-    require(
-      _nodeRegistry.isActive(msg.sender),
-      "TssAccountManager: must be called by an active node"
-    );
+  function registerSigner(bytes32 accountId, uint8 signerIndex, address signerAddress) public {
+    require(_nodeRegistry.isActive(msg.sender), 'TssAccountManager: must be called by an active node');
     require(_accounts[accountId].signersCount > 0, "TssAccountManager: account doesn't exists");
-    require(
-      _accounts[accountId].publicAddress == address(0),
-      "TssAccountManager: account already initialized"
-    );
-    require(
-      _accounts[accountId].signers[signerIndex] == address(0),
-      "TssAccountManager: signer slot already taken"
-    );
+    require(_accounts[accountId].publicAddress == address(0), 'TssAccountManager: account already initialized');
+    require(_accounts[accountId].signers[signerIndex] == address(0), 'TssAccountManager: signer slot already taken');
     bool signersComplete = true;
     for (uint8 i = 0; i < _accounts[accountId].signersCount; i++) {
       require(
         _accounts[accountId].signerNodes[i] != msg.sender,
-        "TssAccountManager: this node is already a signer for the account"
+        'TssAccountManager: this node is already a signer for the account'
       );
       if (signersComplete && _accounts[accountId].signers[i] == address(0)) {
         signersComplete = false;
@@ -138,11 +121,7 @@ contract TssAccountManager is ITssAccountManager {
     _accounts[accountId].signerNodes[signerIndex] = msg.sender;
     emit AccountNewSigner(accountId, msg.sender, signerIndex, signerAddress);
     if (signersComplete) {
-      emit AccountSignersReady(
-        accountId,
-        _accounts[accountId].signersCount,
-        _accounts[accountId].signers
-      );
+      emit AccountSignersReady(accountId, _accounts[accountId].signersCount, _accounts[accountId].signers);
     }
   }
 
@@ -153,16 +132,12 @@ contract TssAccountManager is ITssAccountManager {
     bytes32[] calldata r,
     bytes32[] calldata s
   ) public {
-    require(
-      _accounts[accountId].publicAddress != address(0),
-      "TssAccountManager: publicAddress already set"
-    );
+    require(_accounts[accountId].publicAddress != address(0), 'TssAccountManager: publicAddress already set');
     require(_accounts[accountId].signersCount > 0, "TssAccountManager: account doesn't exists");
     require(
-      _accounts[accountId].signersCount == v.length &&
-        _accounts[accountId].signersCount == r.length &&
-        _accounts[accountId].signersCount == s.length,
-      "TssAccountManager: invalid signatures length"
+      _accounts[accountId].signersCount == v.length && _accounts[accountId].signersCount == r.length
+        && _accounts[accountId].signersCount == s.length,
+      'TssAccountManager: invalid signatures length'
     );
     bytes32 message = MessageHashUtils.toEthSignedMessageHash(abi.encodePacked(accountId, publicAddress));
 
@@ -170,7 +145,7 @@ contract TssAccountManager is ITssAccountManager {
       address recoveredSigner = ECDSA.recover(message, v[i], r[i], s[i]);
       require(
         recoveredSigner == _accounts[accountId].signers[i] && recoveredSigner != address(0),
-        "TssAccountManager: invalid signature"
+        'TssAccountManager: invalid signature'
       );
     }
     _accounts[accountId].publicAddress = publicAddress;
@@ -184,33 +159,35 @@ contract TssAccountManager is ITssAccountManager {
   }
 
   function addRule(bytes32 accountId, Rule memory newRule) public {
-    require(_accounts[accountId].owner == msg.sender, "TssAccountManager: you must be the owner");
+    require(_accounts[accountId].owner == msg.sender, 'TssAccountManager: you must be the owner');
     _validateRule(newRule);
     _rules[accountId].push(newRule);
     emit NewRule(accountId, _rules[accountId].length - 1, newRule);
   }
 
   function expireRule(bytes32 accountId, uint256 ruleIndex) public {
-    require(_accounts[accountId].owner == msg.sender, "TssAccountManager: you must be the owner");
+    require(_accounts[accountId].owner == msg.sender, 'TssAccountManager: you must be the owner');
     Rule storage rule = _rules[accountId][ruleIndex];
-    require(rule.validTo == 0 && rule.validTo > block.timestamp + GRACE_TIME,
-            "TssAccountManager: rule already expired");
+    require(rule.validTo == 0 && rule.validTo > block.timestamp + GRACE_TIME, 'TssAccountManager: rule already expired');
     rule.validTo = uint40(block.timestamp) + GRACE_TIME;
     emit RuleExpired(accountId, ruleIndex, rule.validTo);
   }
 
-  function messagesToSignFromFacts(bytes32 accountId, uint256 ruleIndex, Facts.Fact[] memory facts) external view returns (bytes[] memory messages){
+  function messagesToSignFromFacts(
+    bytes32 accountId,
+    uint256 ruleIndex,
+    Facts.Fact[] memory facts
+  ) external view returns (bytes[] memory messages) {
     Rule storage rule = _rules[accountId][ruleIndex];
     require(rule.targetContract != address(0), "TssAccountManager: rule doesn't exists");
-    require(rule.validFrom <= block.timestamp, "TssAccountManager: rule is not active yet");
-    require(rule.validTo == 0 || rule.validTo >= block.timestamp, "TssAccountManager: rule has expired");
-    bytes memory result = rule.targetContract.functionStaticCall(
-      abi.encodeWithSelector(rule.selector, rule.payload, facts)
-    );
+    require(rule.validFrom <= block.timestamp, 'TssAccountManager: rule is not active yet');
+    require(rule.validTo == 0 || rule.validTo >= block.timestamp, 'TssAccountManager: rule has expired');
+    bytes memory result =
+      rule.targetContract.functionStaticCall(abi.encodeWithSelector(rule.selector, rule.payload, facts));
     return abi.decode(result, (bytes[]));
   }
 
-  function getPublicAddress(bytes32 accountId) external override view returns (address) {
+  function getPublicAddress(bytes32 accountId) external view override returns (address) {
     return _accounts[accountId].publicAddress;
   }
 }
