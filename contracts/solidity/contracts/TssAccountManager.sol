@@ -2,21 +2,22 @@
 pragma solidity ^0.8.0;
 
 import {INodeRegistry} from "../interfaces/INodeRegistry.sol";
+import {ITssAccountManager} from "../interfaces/ITssAccountManager.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {Facts} from "./Facts.sol";
 
-contract TssAccountManager {
+contract TssAccountManager is ITssAccountManager {
   using Address for address;
 
   /**
    * @dev GRACE_TIME is the time we leave to the nodes before they know a rule has expired.
    */
   uint40 public constant GRACE_TIME = 3600;
-  
+
   uint8 private nonce = 0;
-  uint24 public createAccountFee = 1 ether;
+  uint256 public constant createAccountFee = 1 ether;
 
   INodeRegistry immutable _nodeRegistry;
 
@@ -69,14 +70,12 @@ contract TssAccountManager {
     uint8 signersCount_,
     uint8 threshold_,
     address owner_,
-    Rule[] calldata rules
-  ) public payable {
-    // TODO: add somekind of whitelist or payment to create accounts
+    Rule[] memory rules
+  ) public payable returns (bytes32 accountId) {
     require(msg.value == createAccountFee, "TssAccountManager: Incorrect fee sent");
+
+    accountId = keccak256(abi.encodePacked(msg.sender, block.timestamp, nonce));
     require(_accounts[accountId].signersCount == 0, "TssAccountManager: Account already exists!");
-    
-    // TODO Generate a pseudorandom accountId using the sender's address, current block timestamp, and the nonce
-    bytes32 accountId = keccak256(abi.encodePacked(msg.sender, block.timestamp, nonce));
     nonce++;
 
     require(
@@ -97,6 +96,7 @@ contract TssAccountManager {
       _rules[accountId].push(rules[i]);
       emit NewRule(accountId, i, rules[i]);
     }
+    return accountId;
   }
 
   function _validateRule(Rule memory rule) internal view {
@@ -208,5 +208,9 @@ contract TssAccountManager {
       abi.encodeWithSelector(rule.selector, rule.payload, facts)
     );
     return abi.decode(result, (bytes[]));
+  }
+
+  function getPublicAddress(bytes32 accountId) external override view returns (address) {
+    return _accounts[accountId].publicAddress;
   }
 }
