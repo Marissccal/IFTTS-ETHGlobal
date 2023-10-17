@@ -6,9 +6,9 @@ import {ECDSA} from '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
 import {MessageHashUtils} from '@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol';
 
 contract DisputeCourt {
-  ITssAccountManager immutable _tssAccountManager;
-
   uint40 public constant DISPUTE_RESOLUTION_TIME = 7 days;
+
+  ITssAccountManager public immutable ACCOUNT_MGR;
 
   enum DisputeType {
     invalid,
@@ -40,19 +40,19 @@ contract DisputeCourt {
   mapping(uint256 => NonExistentRuleDispute) internal _nonExistentRuleDisputes;
 
   event DisputeRaised(
-    uint256 indexed disputeId, address indexed complainant, bytes32 indexed accountId, DisputeType disputeType
+    uint256 indexed _disputeId, address indexed _complainant, bytes32 indexed _accountId, DisputeType _disputeType
   );
-  event DisputeResolved(uint256 indexed disputeId);
-  event DisputeRejected(uint256 indexed disputeId);
+  event DisputeResolved(uint256 indexed _disputeId);
+  event DisputeRejected(uint256 indexed _disputeId);
 
-  event NonExistentRuleDisputeRaised(uint256 indexed disputeId, bytes message);
+  event NonExistentRuleDisputeRaised(uint256 indexed _disputeId, bytes _message);
 
-  constructor(ITssAccountManager tssAccountManager) {
-    _tssAccountManager = tssAccountManager;
+  constructor(ITssAccountManager _tssAccountManager) {
+    ACCOUNT_MGR = _tssAccountManager;
   }
 
-  function _raiseDispute(bytes32 _accountId, DisputeType _disputeType) internal returns (uint256) {
-    Dispute memory newDispute = Dispute({
+  function _raiseDispute(bytes32 _accountId, DisputeType _disputeType) internal returns (uint256 _disputeId) {
+    Dispute memory _newDispute = Dispute({
       complainant: msg.sender,
       accountId: _accountId,
       disputeType: _disputeType,
@@ -60,27 +60,27 @@ contract DisputeCourt {
       deadline: uint40(block.timestamp) + DISPUTE_RESOLUTION_TIME
     });
 
-    disputes.push(newDispute);
-    uint256 disputeId = disputes.length - 1;
-    emit DisputeRaised(disputeId, msg.sender, _accountId, _disputeType);
-    return disputeId;
+    disputes.push(_newDispute);
+    _disputeId = disputes.length - 1;
+    emit DisputeRaised(_disputeId, msg.sender, _accountId, _disputeType);
+    return _disputeId;
   }
 
   function raiseNonExistentRuleDispute(
     bytes32 _accountId,
     bytes memory _message,
-    uint8 v,
-    bytes32 r,
-    bytes32 s
-  ) external returns (uint256 disputeId) {
-    address publicAddress = _tssAccountManager.getPublicAddress(_accountId);
-    require(publicAddress != address(0), 'DisputeCourt: account is not active');
-    bytes32 messageHash = MessageHashUtils.toEthSignedMessageHash(_message);
-    address recoveredSigner = ECDSA.recover(messageHash, v, r, s);
-    require(publicAddress == recoveredSigner, "DisputeCourt: disputed message wasn't signed by the address");
-    disputeId = _raiseDispute(_accountId, DisputeType.sigOfNonExistentRule);
-    _nonExistentRuleDisputes[disputeId] = NonExistentRuleDispute({message: _message});
-    emit NonExistentRuleDisputeRaised(disputeId, _message);
+    uint8 _v,
+    bytes32 _r,
+    bytes32 _s
+  ) external returns (uint256 _disputeId) {
+    address _publicAddress = ACCOUNT_MGR.getPublicAddress(_accountId);
+    require(_publicAddress != address(0), 'DisputeCourt: account inactive');
+    bytes32 _messageHash = MessageHashUtils.toEthSignedMessageHash(_message);
+    address _recoveredSigner = ECDSA.recover(_messageHash, _v, _r, _s);
+    require(_publicAddress == _recoveredSigner, 'DisputeCourt: message not signed');
+    _disputeId = _raiseDispute(_accountId, DisputeType.sigOfNonExistentRule);
+    _nonExistentRuleDisputes[_disputeId] = NonExistentRuleDispute({message: _message});
+    emit NonExistentRuleDisputeRaised(_disputeId, _message);
   }
 
   function resolveDispute(uint256 _disputeId) public {

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-import '../../contracts/DisputeCourt.sol';
-import '../../contracts/TssAccountManager.sol';
-import '../../contracts/NodeRegistry.sol';
-import 'forge-std/Test.sol';
+import {DisputeCourt} from '../../contracts/DisputeCourt.sol';
+import {TssAccountManager} from '../../contracts/TssAccountManager.sol';
+import {NodeRegistry} from '../../contracts/NodeRegistry.sol';
+import {Test} from 'forge-std/Test.sol';
 
 contract E2EDisputeCourt is Test {
   DisputeCourt public disputeCourt;
@@ -12,25 +12,26 @@ contract E2EDisputeCourt is Test {
   NodeRegistry public nodeRegistry;
   bytes32 public inactiveAccountId;
   bytes32 public activeAccountId;
-  address[] nodes;
+  address[] public nodes;
 
   constructor() {
     vm.deal(address(this), 10 ether);
     nodeRegistry = new NodeRegistry(address(this));
     accountManager = new TssAccountManager(nodeRegistry);
     disputeCourt = new DisputeCourt(accountManager);
-    TssAccountManager.Rule[] memory rules = new TssAccountManager.Rule[](0);
+    TssAccountManager.Rule[] memory _rules;
     inactiveAccountId =
-      accountManager.createAccount{value: accountManager.createAccountFee()}(2, 2, address(this), rules);
+      accountManager.createAccount{value: accountManager.createAccountFee()}(2, 2, address(this), _rules);
 
     // Create several nodes
-    for (uint256 i = 0; i < 5; i++) {
-      address node = address(uint160(i + 1));
-      nodes.push(node);
-      nodeRegistry.registerNode(node);
+    for (uint256 _i = 0; _i < 5; _i++) {
+      address _node = address(uint160(_i + 1));
+      nodes.push(_node);
+      nodeRegistry.registerNode(_node);
     }
     // Setup an account
-    activeAccountId = accountManager.createAccount{value: accountManager.createAccountFee()}(2, 2, address(this), rules);
+    activeAccountId =
+      accountManager.createAccount{value: accountManager.createAccountFee()}(2, 2, address(this), _rules);
     vm.prank(nodes[0]);
     accountManager.registerSigner(activeAccountId, 0, address(1001));
     vm.prank(nodes[1]);

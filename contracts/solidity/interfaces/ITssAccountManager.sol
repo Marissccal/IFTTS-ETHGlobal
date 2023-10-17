@@ -6,5 +6,5 @@ pragma solidity ^0.8.0;
  * @dev Interface for the TssAccountManager
  */
 interface ITssAccountManager {
-  function getPublicAddress(bytes32 accountId) external view returns (address);
+  function getPublicAddress(bytes32 _accountId) external view returns (address _publicAddress);
 }
