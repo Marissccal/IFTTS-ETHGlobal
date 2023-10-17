@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-import "../../contracts/disputeCourt.sol";
+import "../../contracts/DisputeCourt.sol";
 import "../../contracts/TssAccountManager.sol";
-import "../../contracts/nodeRegistry.sol";
+import "../../contracts/NodeRegistry.sol";
 import "forge-std/Test.sol";
 
 contract E2EDisputeCourt is Test {
