@@ -20,5 +20,4 @@ out/*/*
 # Keep the latest deployment only
 broadcast/*/*/*
 
-lib/openzeppelin-contracts/*
-lib/protocol/*
+lib/**

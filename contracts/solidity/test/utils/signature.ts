@@ -3,9 +3,8 @@ import Web3 from "web3";
 require('dotenv').config();
 
 async function signMessage() {
-       const web3 = new Web3('https://goerli.infura.io/v3/d4d27510163249dbb2f244e68d4707d4');
+       const web3 = new Web3(process.env.WEB3_PROVIDER_URL as string);
 
-       const account = '0x6666Ec43dEb25910121Dd544E89301a86165Fa6b';
        const privateKey = process.env.ADDRESS_PK as string;
 
        const messageHash = "0x592fa743889fc7f92ac2a37bb1f5ba1daf2a5c84741ca0e0061d243a2e6707ba";
