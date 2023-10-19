@@ -19,5 +19,3 @@ out/*/*
 
 # Keep the latest deployment only
 broadcast/*/*/*
-
-lib/**

@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import {ITssAccountManager} from '../interfaces/ITssAccountManager.sol';
 import {ECDSA} from '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
 import {MessageHashUtils} from '@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol';
+import {Oracle} from "@uma/core/contracts/optimistic-oracle-v3/implementation/OptimisticOracleV3.sol";
 
 contract DisputeCourt {
   uint40 public constant DISPUTE_RESOLUTION_TIME = 7 days;
@@ -87,8 +88,14 @@ contract DisputeCourt {
     // Add multisignature exucution??
     require(disputes[_disputeId].status == DisputeStatus.Open, 'Dispute is not open');
     require(disputes[_disputeId].deadline <= block.timestamp, 'Dispute is still challengeable');
-    disputes[_disputeId].status = DisputeStatus.Resolved;
-    emit DisputeResolved(_disputeId);
+    bool result = Oracle.settleAndGetAssertionResult(keccak256(abi.encodePacked(_disputeId)));
+        if (result) {
+            disputes[_disputeId].status = DisputeStatus.Resolved;
+            emit DisputeResolved(_disputeId);
+        } else {
+            disputes[_disputeId].status = DisputeStatus.Rejected;
+            emit DisputeRejected(_disputeId);
+        }
   }
 
   function rejectDispute(uint256 _disputeId) public {
