@@ -1,9 +1,3 @@
-[submodule "/home/mariscal/web3/IFTTS-ETHGlobal/contracts/lib/openzeppelin-contracts"]
-	path = /home/mariscal/web3/IFTTS-ETHGlobal/contracts/lib/openzeppelin-contracts
-	url = https://github.com/OpenZeppelin/openzeppelin-contracts.git
-[submodule "/home/mariscal/web3/IFTTS-ETHGlobal/contracts/lib/forge-std"]
-	path = /home/mariscal/web3/IFTTS-ETHGlobal/contracts/lib/forge-std
-	url = https://github.com/foundry-rs/forge-std.git
-[submodule "/home/mariscal/web3/IFTTS-ETHGlobal/contracts/lib/protocol"]
-	path = /home/mariscal/web3/IFTTS-ETHGlobal/contracts/lib/protocol
-	url = https://github.com/UMAprotocol/protocol.git
+[submodule "/home/mariscal/web3/IFTTS-ETHGlobal/contracts/lib/dev-quickstart-oov3"]
+	path = /home/mariscal/web3/IFTTS-ETHGlobal/contracts/lib/dev-quickstart-oov3
+	url = https://github.com/UMAprotocol/dev-quickstart-oov3

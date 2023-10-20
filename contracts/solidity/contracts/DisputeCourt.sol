@@ -23,12 +23,23 @@ contract DisputeCourt {
     Rejected // This state is when the dispute was rejected (before deadline)
   }
 
+  enum OracleStatus {
+    NotRequested,
+    Requested,
+    Resolved
+  }
+
   struct Dispute {
     address complainant; // Address of the user who raised the dispute
     bytes32 accountId; // Id of the account in question
     DisputeType disputeType; // Reason for the dispute
     DisputeStatus status; // Status of the dispute
     uint40 deadline; // Deadline until the dispute can be challenged
+  }
+
+  struct OracleRequest {
+    OracleStatus status;
+    uint40 deadline;
   }
 
   Dispute[] public disputes;
@@ -38,6 +49,8 @@ contract DisputeCourt {
   }
 
   mapping(uint256 => NonExistentRuleDispute) internal _nonExistentRuleDisputes;
+
+  mapping(uint256 => OracleRequest) public oracleRequests;
 
   event DisputeRaised(
     uint256 indexed _disputeId, address indexed _complainant, bytes32 indexed _accountId, DisputeType _disputeType
@@ -66,6 +79,12 @@ contract DisputeCourt {
     disputes.push(_newDispute);
     _disputeId = disputes.length - 1;
     emit DisputeRaised(_disputeId, msg.sender, _accountId, _disputeType);
+
+    optimisticOracleV3Instance.getAssertionResult(keccak256(abi.encodePacked(_disputeId)));
+    oracleRequests[_disputeId] = OracleRequest({
+        status: OracleStatus.Requested,
+        deadline: uint40(block.timestamp) + DISPUTE_RESOLUTION_TIME
+    });
     return _disputeId;
   }
 
@@ -90,14 +109,18 @@ contract DisputeCourt {
     // Add multisignature exucution??
     require(disputes[_disputeId].status == DisputeStatus.Open, 'Dispute is not open');
     require(disputes[_disputeId].deadline <= block.timestamp, 'Dispute is still challengeable');
+    require(oracleRequests[_disputeId].deadline <= block.timestamp, 'Oracle result is still challengeable');
+    
     bool result = optimisticOracleV3Instance.settleAndGetAssertionResult(keccak256(abi.encodePacked(_disputeId)));
-        if (result) {
-            disputes[_disputeId].status = DisputeStatus.Resolved;
-            emit DisputeResolved(_disputeId);
-        } else {
-            disputes[_disputeId].status = DisputeStatus.Rejected;
-            emit DisputeRejected(_disputeId);
-        }
+    if (result) {
+        disputes[_disputeId].status = DisputeStatus.Resolved;
+        emit DisputeResolved(_disputeId);
+    } else {
+        disputes[_disputeId].status = DisputeStatus.Rejected;
+        emit DisputeRejected(_disputeId);
+    }
+
+    oracleRequests[_disputeId].status = OracleStatus.Resolved;
   }
 
   function rejectDispute(uint256 _disputeId) public {
