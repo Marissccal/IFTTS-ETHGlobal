@@ -3,8 +3,7 @@ pragma solidity ^0.8.0;
 
 import {ITssAccountManager} from '../interfaces/ITssAccountManager.sol';
 import {ECDSA} from '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
-import {MessageHashUtils} from '@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol';
-import {Oracle} from "@uma/core/contracts/optimistic-oracle-v3/implementation/OptimisticOracleV3.sol";
+import {OptimisticOracleV3} from "@uma/core/contracts/optimistic-oracle-v3/implementation/OptimisticOracleV3.sol";
 
 contract DisputeCourt {
   uint40 public constant DISPUTE_RESOLUTION_TIME = 7 days;
@@ -48,8 +47,11 @@ contract DisputeCourt {
 
   event NonExistentRuleDisputeRaised(uint256 indexed _disputeId, bytes _message);
 
-  constructor(ITssAccountManager _tssAccountManager) {
+  OptimisticOracleV3 public optimisticOracleV3Instance;
+
+  constructor(ITssAccountManager _tssAccountManager, address _optimisticOracleV3Address) {
     ACCOUNT_MGR = _tssAccountManager;
+    optimisticOracleV3Instance = OptimisticOracleV3(_optimisticOracleV3Address);
   }
 
   function _raiseDispute(bytes32 _accountId, DisputeType _disputeType) internal returns (uint256 _disputeId) {
@@ -76,7 +78,7 @@ contract DisputeCourt {
   ) external returns (uint256 _disputeId) {
     address _publicAddress = ACCOUNT_MGR.getPublicAddress(_accountId);
     require(_publicAddress != address(0), 'DisputeCourt: account inactive');
-    bytes32 _messageHash = MessageHashUtils.toEthSignedMessageHash(_message);
+    bytes32 _messageHash = ECDSA.toEthSignedMessageHash(_message);
     address _recoveredSigner = ECDSA.recover(_messageHash, _v, _r, _s);
     require(_publicAddress == _recoveredSigner, 'DisputeCourt: message not signed');
     _disputeId = _raiseDispute(_accountId, DisputeType.sigOfNonExistentRule);
@@ -88,7 +90,7 @@ contract DisputeCourt {
     // Add multisignature exucution??
     require(disputes[_disputeId].status == DisputeStatus.Open, 'Dispute is not open');
     require(disputes[_disputeId].deadline <= block.timestamp, 'Dispute is still challengeable');
-    bool result = Oracle.settleAndGetAssertionResult(keccak256(abi.encodePacked(_disputeId)));
+    bool result = optimisticOracleV3Instance.settleAndGetAssertionResult(keccak256(abi.encodePacked(_disputeId)));
         if (result) {
             disputes[_disputeId].status = DisputeStatus.Resolved;
             emit DisputeResolved(_disputeId);

@@ -5,7 +5,6 @@ import {INodeRegistry} from '../interfaces/INodeRegistry.sol';
 import {ITssAccountManager} from '../interfaces/ITssAccountManager.sol';
 import {Address} from '@openzeppelin/contracts/utils/Address.sol';
 import {ECDSA} from '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
-import {MessageHashUtils} from '@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol';
 import {Facts} from './Facts.sol';
 
 contract TssAccountManager is ITssAccountManager {
@@ -139,7 +138,7 @@ contract TssAccountManager is ITssAccountManager {
       _account.signersCount == _v.length && _account.signersCount == _r.length && _account.signersCount == _s.length,
       'TssAccountManager: invalid signatures length'
     );
-    bytes32 _message = MessageHashUtils.toEthSignedMessageHash(abi.encodePacked(_accountId, _publicAddress));
+    bytes32 _message = ECDSA.toEthSignedMessageHash(abi.encodePacked(_accountId, _publicAddress));
 
     for (uint8 _i = 0; _i < _account.signersCount; _i++) {
       address _recoveredSigner = ECDSA.recover(_message, _v[_i], _r[_i], _s[_i]);
