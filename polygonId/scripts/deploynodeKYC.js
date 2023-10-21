@@ -1,7 +1,7 @@
 async function main() {
   const verifierContract = "NodeKYC";
-  const verifierName = "ERC20zkAirdrop";
-  const verifierSymbol = "zkERC20";
+  const verifierName = "NodeRegwithPolygonId";
+  const verifierSymbol = "zk";
 
 
   const poseidonFacade = "0xD65f5Fc521C4296723c6Eb16723A8171dCC12FB0";

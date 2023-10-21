@@ -9,6 +9,14 @@ module.exports = {
       chainId: 80001,
       url: `${process.env.ALCHEMY_MUMBAI_URL}`,
       accounts: [`0x${process.env.MUMBAI_PRIVATE_KEY}`]
+    },
+    scroll: {
+      chainId: 534351,
+      url: "https://sepolia-rpc.scroll.io",
+      accounts: [`0x${process.env.MUMBAI_PRIVATE_KEY}`]
     }
   }
 };
+
+
+
