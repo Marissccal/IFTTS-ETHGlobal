@@ -3,13 +3,14 @@ pragma solidity ^0.8.0;
 
 import {ITssAccountManager} from '../interfaces/ITssAccountManager.sol';
 import {ECDSA} from '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
-import {OptimisticOracleV3} from '@uma/core/contracts/optimistic-oracle-v3/implementation/OptimisticOracleV3.sol';
+import {OptimisticOracleV3Interface} from '@uma/core/contracts/optimistic-oracle-v3/interfaces/OptimisticOracleV3Interface.sol'; // Cambiamos la ruta a la interfaz
 import {Facts} from './Facts.sol';
 
 contract DisputeCourt {
-  uint40 public constant DISPUTE_RESOLUTION_TIME = 7 days;
+  uint64 public constant DISPUTE_RESOLUTION_TIME = 7 days;
 
   ITssAccountManager public immutable ACCOUNT_MGR;
+  OptimisticOracleV3Interface public immutable ACCOUNT_ORACLE;
 
   enum DisputeType {
     invalid,
@@ -35,12 +36,12 @@ contract DisputeCourt {
     bytes32 accountId; // Id of the account in question
     DisputeType disputeType; // Reason for the dispute
     DisputeStatus status; // Status of the dispute
-    uint40 deadline; // Deadline until the dispute can be challenged
+    uint64 deadline; // Deadline until the dispute can be challenged
   }
 
   struct OracleRequest {
     OracleStatus status;
-    uint40 deadline;
+    uint64 deadline;
   }
 
   Dispute[] public disputes;
@@ -59,13 +60,11 @@ contract DisputeCourt {
   event DisputeResolved(uint256 indexed _disputeId);
   event DisputeRejected(uint256 indexed _disputeId);
 
-  event NonExistentRuleDisputeRaised(uint256 indexed _disputeId, bytes _message);
+  event NonExistentRuleDisputeRaised(uint256 indexed _disputeId, bytes _message);  
 
-  OptimisticOracleV3 public optimisticOracleV3Instance;
-
-  constructor(ITssAccountManager _tssAccountManager, address _optimisticOracleV3Address) {
+  constructor(ITssAccountManager _tssAccountManager, OptimisticOracleV3Interface _optimisticOracleV3Address) {
     ACCOUNT_MGR = _tssAccountManager;
-    optimisticOracleV3Instance = OptimisticOracleV3(_optimisticOracleV3Address);
+    ACCOUNT_ORACLE = _optimisticOracleV3Address;
   }
 
   function _raiseDispute(bytes32 _accountId, DisputeType _disputeType) internal returns (uint256 _disputeId) {
@@ -74,17 +73,12 @@ contract DisputeCourt {
       accountId: _accountId,
       disputeType: _disputeType,
       status: DisputeStatus.Open,
-      deadline: uint40(block.timestamp) + DISPUTE_RESOLUTION_TIME
+      deadline: uint64(block.timestamp) + DISPUTE_RESOLUTION_TIME
     });
 
     disputes.push(_newDispute);
     _disputeId = disputes.length - 1;
-    emit DisputeRaised(_disputeId, msg.sender, _accountId, _disputeType);
-
-    optimisticOracleV3Instance.getAssertionResult(keccak256(abi.encodePacked(_disputeId)));
-    oracleRequests[_disputeId] =
-      OracleRequest({status: OracleStatus.Requested, deadline: uint40(block.timestamp) + DISPUTE_RESOLUTION_TIME});
-    return _disputeId;
+    emit DisputeRaised(_disputeId, msg.sender, _accountId, _disputeType);    
   }
 
   function raiseNonExistentRuleDispute(
@@ -110,7 +104,7 @@ contract DisputeCourt {
     require(disputes[_disputeId].deadline <= block.timestamp, 'Dispute is still challengeable');
     require(oracleRequests[_disputeId].deadline <= block.timestamp, 'Oracle result is still challengeable');
 
-    bool _result = optimisticOracleV3Instance.settleAndGetAssertionResult(keccak256(abi.encodePacked(_disputeId)));
+    bool _result = ACCOUNT_ORACLE.settleAndGetAssertionResult(keccak256(abi.encodePacked(_disputeId)));
     if (_result) {
       disputes[_disputeId].status = DisputeStatus.Resolved;
       emit DisputeResolved(_disputeId);
@@ -139,9 +133,9 @@ contract DisputeCourt {
 
     _disputeId = _raiseDispute(_accountId, DisputeType.sigOfFalseFact);
 
-    optimisticOracleV3Instance.getAssertionResult(keccak256(abi.encodePacked(_disputeId)));
+    ACCOUNT_ORACLE.getAssertionResult(keccak256(abi.encodePacked(_disputeId)));
     oracleRequests[_disputeId] =
-      OracleRequest({status: OracleStatus.Requested, deadline: uint40(block.timestamp) + DISPUTE_RESOLUTION_TIME});
+      OracleRequest({status: OracleStatus.Requested, deadline: uint64(block.timestamp) + DISPUTE_RESOLUTION_TIME});
 
     return _disputeId;
   }

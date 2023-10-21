@@ -5,33 +5,36 @@ import {DisputeCourt} from '../../contracts/DisputeCourt.sol';
 import {TssAccountManager} from '../../contracts/TssAccountManager.sol';
 import {NodeRegistry} from '../../contracts/NodeRegistry.sol';
 import {OptimisticOracleV3} from '@uma/core/contracts/optimistic-oracle-v3/implementation/OptimisticOracleV3.sol';
-import {FinderMock} from '../utils/FinderMock.sol';
-import {SafeERC20, IERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import {Finder} from '@uma/core/contracts/data-verification-mechanism/implementation/Finder.sol';
+import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import {ECDSA} from '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
 import {Test} from 'forge-std/Test.sol';
 
-contract E2EDisputeCourt is Test {
-  using SafeERC20 for IERC20;
 
+contract E2EDisputeCourt is Test {         
   DisputeCourt public disputeCourt;
-  OptimisticOracleV3 public optimisticOracleV3;
+  OptimisticOracleV3 public accountOracle;
   TssAccountManager public accountManager;
+  Finder public finder;  
   NodeRegistry public nodeRegistry;
   bytes32 public inactiveAccountId;
   bytes32 public activeAccountId;
-  address[] public nodes;
-  uint64 public defaultLivenessValue;
-  FinderMock public finder;
-  IERC20 public defaultCurrencyInstance;
+  address[] public nodes;       
+  IERC20 public defaultCurrency; 
+  uint64 public defaultLiveness;
+  uint256 public startAt;
+  
 
-  constructor() {
-    vm.deal(address(this), 10 ether);
-    finder = new FinderMock();
-    defaultCurrencyInstance = IERC20(address(0));
-    defaultLivenessValue = 100;
-    optimisticOracleV3 = new OptimisticOracleV3(finder, defaultCurrencyInstance, defaultLivenessValue);
+  constructor(address _erc20Address) {
+    startAt = block.timestamp;
+    vm.deal(address(this), 10 ether);    
     nodeRegistry = new NodeRegistry(address(this));
     accountManager = new TssAccountManager(nodeRegistry);
-    disputeCourt = new DisputeCourt(accountManager, address(optimisticOracleV3));
+    finder = new Finder();    
+    defaultCurrency = IERC20(_erc20Address);
+    defaultLiveness = 100;
+    accountOracle = new OptimisticOracleV3(finder, defaultCurrency, defaultLiveness); 
+    disputeCourt = new DisputeCourt(accountManager, accountOracle);
     TssAccountManager.Rule[] memory _rules;
     inactiveAccountId =
       accountManager.createAccount{value: accountManager.createAccountFee()}(2, 2, address(this), _rules);
@@ -40,7 +43,7 @@ contract E2EDisputeCourt is Test {
     for (uint256 _i = 0; _i < 5; _i++) {
       address _node = address(uint160(_i + 1));
       nodes.push(_node);
-      nodeRegistry.registerNode(_node);
+      nodeRegistry.registerNode(address(this));
     }
     // Setup an account
     activeAccountId =
@@ -50,13 +53,30 @@ contract E2EDisputeCourt is Test {
     vm.prank(nodes[1]);
     accountManager.registerSigner(activeAccountId, 1, address(1002));
   }
+  
 
   function testRaiseDispute() public {
+    // Try raising a dispute for an inactive account
+    
     vm.expectRevert(bytes('DisputeCourt: account inactive'));
     disputeCourt.raiseNonExistentRuleDispute(inactiveAccountId, bytes('Hi'), 0, 0, 0);
+       
   }
 
-  function testResolveDispute() public {}
+  /*function testResolveDispute() public {
+    // Levanta una disputa para una cuenta activa
+    uint256 disputeId = disputeCourt._raiseDispute(activeAccountId, disputeType);
+    
+    // Verifica que no puede resolver la disputa inmediatamente ya que aún es desafiable
+    vm.expectRevert(bytes('Dispute is still challengeable'));
+    disputeCourt.resolveDispute(disputeId);
 
-  function testRejectDispute() public {}
+    // Adelanta el tiempo para superar el plazo DISPUTE_RESOLUTION_TIME
+    vm.warp(startAt + 8 days);
+    
+    // Resuelve la disputa y verifica que ha sido resuelta correctamente
+    disputeCourt.resolveDispute(disputeId);
+
+}*/
+  
 }
