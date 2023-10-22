@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 contract HashVerificationContract {
-    
     // The expected hash value
     bytes32 private expectedHash;
 
@@ -18,7 +17,5 @@ contract HashVerificationContract {
     }
 
     // Function that can only be executed with the correct original data that matches the stored hash
-    function executeFunction(bytes32 _originalData) public validData(_originalData) {
-       
-    }
+    function executeFunction(bytes32 _originalData) public validData(_originalData) {}
 }

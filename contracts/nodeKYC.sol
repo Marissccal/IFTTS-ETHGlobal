@@ -33,25 +33,19 @@ contract NodeKYC is Ownable, ZKPVerifier {
         emit NodeDeregistered(node);
     }
 
-    function _beforeProofSubmit(
-        uint64 /* requestId */,
-        uint256[] memory inputs,
-        ICircuitValidator validator
-    ) internal view override {
-        address addr = GenesisUtils.int256ToAddress(
-            inputs[validator.getChallengeInputIndex()]
-        );
-        require(
-            _msgSender() == addr,
-            "address in proof is not a sender address"
-        );
+    function _beforeProofSubmit(uint64, /* requestId */ uint256[] memory inputs, ICircuitValidator validator)
+        internal
+        view
+        override
+    {
+        address addr = GenesisUtils.int256ToAddress(inputs[validator.getChallengeInputIndex()]);
+        require(_msgSender() == addr, "address in proof is not a sender address");
     }
 
-    function _afterProofSubmit(
-        uint64 requestId,
-        uint256[] memory inputs,
-        ICircuitValidator validator
-    ) internal override {
+    function _afterProofSubmit(uint64 requestId, uint256[] memory inputs, ICircuitValidator validator)
+        internal
+        override
+    {
         require(
             requestId == TRANSFER_REQUEST_ID && addressToId[_msgSender()] == 0,
             "proof can not be submitted more than once"
