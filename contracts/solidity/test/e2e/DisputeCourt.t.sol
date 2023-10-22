@@ -44,7 +44,7 @@ contract E2EDisputeCourt is Test {
   }
 
   function testRaiseDispute() public {
-    vm.expectRevert(bytes('DisputeCourt: account is not active'));
+    vm.expectRevert(bytes('DisputeCourt: account inactive'));
     disputeCourt.raiseNonExistentRuleDispute(inactiveAccountId, bytes('Hola'), 0, 0, 0);
     /*
         string memory reason = "Test dispute reason";

@@ -133,7 +133,7 @@ contract TssAccountManager is ITssAccountManager {
     bytes32[] calldata _s
   ) public {
     Account storage _account = _accounts[_accountId];
-    require(_account.publicAddress != address(0), 'TssAccountManager: publicAddress already set');
+    require(_account.publicAddress == address(0), 'TssAccountManager: publicAddress already set');
     require(_account.signersCount > 0, 'TssAccountManager: account doesn\'t exists');
     require(
       _account.signersCount == _v.length && _account.signersCount == _r.length && _account.signersCount == _s.length,
