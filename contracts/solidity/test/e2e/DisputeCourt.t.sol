@@ -63,20 +63,27 @@ contract E2EDisputeCourt is Test {
        
   }
 
-  /*function testResolveDispute() public {
-    // Levanta una disputa para una cuenta activa
-    uint256 disputeId = disputeCourt._raiseDispute(activeAccountId, disputeType);
+  function testResolveDispute() public {
+    /*
+    bytes memory _message = bytes("Hello");
+    bytes32 _messageHash = ECDSA.toEthSignedMessageHash(_message);
+    bytes memory signature = vm.sign(_messageHash); 
     
-    // Verifica que no puede resolver la disputa inmediatamente ya que aún es desafiable
-    vm.expectRevert(bytes('Dispute is still challengeable'));
-    disputeCourt.resolveDispute(disputeId);
+    uint8 v;
+    bytes32 r;
+    bytes32 s;
+    (bytes memory r, bytes memory s, uint8 v) = vm.sign(_messageHash, nodes[0]);
 
-    // Adelanta el tiempo para superar el plazo DISPUTE_RESOLUTION_TIME
+    uint256 disputeId = disputeCourt.raiseNonExistentRuleDispute(activeAccountId, _message, v, r, s);
+    
     vm.warp(startAt + 8 days);
-    
-    // Resuelve la disputa y verifica que ha sido resuelta correctamente
     disputeCourt.resolveDispute(disputeId);
+    
+    DisputeCourt.DisputeStatus status = disputeCourt.disputes(disputeId).status;
+    vm.assertEqual(uint(status), uint(DisputeCourt.DisputeStatus.Resolved), "The dispute should be resolved");
+*/
+}
 
-}*/
+
   
 }
