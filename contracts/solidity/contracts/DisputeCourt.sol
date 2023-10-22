@@ -3,7 +3,8 @@ pragma solidity ^0.8.0;
 
 import {ITssAccountManager} from '../interfaces/ITssAccountManager.sol';
 import {ECDSA} from '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
-import {OptimisticOracleV3Interface} from '@uma/core/contracts/optimistic-oracle-v3/interfaces/OptimisticOracleV3Interface.sol'; // Cambiamos la ruta a la interfaz
+import {OptimisticOracleV3Interface} from
+  '@uma/core/contracts/optimistic-oracle-v3/interfaces/OptimisticOracleV3Interface.sol'; // Cambiamos la ruta a la interfaz
 import {Facts} from './Facts.sol';
 
 contract DisputeCourt {
@@ -60,7 +61,7 @@ contract DisputeCourt {
   event DisputeResolved(uint256 indexed _disputeId);
   event DisputeRejected(uint256 indexed _disputeId);
 
-  event NonExistentRuleDisputeRaised(uint256 indexed _disputeId, bytes _message);  
+  event NonExistentRuleDisputeRaised(uint256 indexed _disputeId, bytes _message);
 
   constructor(ITssAccountManager _tssAccountManager, OptimisticOracleV3Interface _optimisticOracleV3Address) {
     ACCOUNT_MGR = _tssAccountManager;
@@ -78,7 +79,7 @@ contract DisputeCourt {
 
     disputes.push(_newDispute);
     _disputeId = disputes.length - 1;
-    emit DisputeRaised(_disputeId, msg.sender, _accountId, _disputeType);    
+    emit DisputeRaised(_disputeId, msg.sender, _accountId, _disputeType);
   }
 
   function raiseNonExistentRuleDispute(

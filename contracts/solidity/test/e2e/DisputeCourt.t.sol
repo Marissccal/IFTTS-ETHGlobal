@@ -7,33 +7,31 @@ import {NodeRegistry} from '../../contracts/NodeRegistry.sol';
 import {OptimisticOracleV3} from '@uma/core/contracts/optimistic-oracle-v3/implementation/OptimisticOracleV3.sol';
 import {Finder} from '@uma/core/contracts/data-verification-mechanism/implementation/Finder.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
-import {ECDSA} from '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
+// {ECDSA} from '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
 import {Test} from 'forge-std/Test.sol';
 
-
-contract E2EDisputeCourt is Test {         
+contract E2EDisputeCourt is Test {
   DisputeCourt public disputeCourt;
   OptimisticOracleV3 public accountOracle;
   TssAccountManager public accountManager;
-  Finder public finder;  
+  Finder public finder;
   NodeRegistry public nodeRegistry;
   bytes32 public inactiveAccountId;
   bytes32 public activeAccountId;
-  address[] public nodes;       
-  IERC20 public defaultCurrency; 
+  address[] public nodes;
+  IERC20 public defaultCurrency;
   uint64 public defaultLiveness;
   uint256 public startAt;
-  
 
   constructor(address _erc20Address) {
     startAt = block.timestamp;
-    vm.deal(address(this), 10 ether);    
+    vm.deal(address(this), 10 ether);
     nodeRegistry = new NodeRegistry(address(this));
     accountManager = new TssAccountManager(nodeRegistry);
-    finder = new Finder();    
+    finder = new Finder();
     defaultCurrency = IERC20(_erc20Address);
     defaultLiveness = 100;
-    accountOracle = new OptimisticOracleV3(finder, defaultCurrency, defaultLiveness); 
+    accountOracle = new OptimisticOracleV3(finder, defaultCurrency, defaultLiveness);
     disputeCourt = new DisputeCourt(accountManager, accountOracle);
     TssAccountManager.Rule[] memory _rules;
     inactiveAccountId =
@@ -53,14 +51,12 @@ contract E2EDisputeCourt is Test {
     vm.prank(nodes[1]);
     accountManager.registerSigner(activeAccountId, 1, address(1002));
   }
-  
 
   function testRaiseDispute() public {
     // Try raising a dispute for an inactive account
-    
+
     vm.expectRevert(bytes('DisputeCourt: account inactive'));
     disputeCourt.raiseNonExistentRuleDispute(inactiveAccountId, bytes('Hi'), 0, 0, 0);
-       
   }
 
   function testResolveDispute() public {
@@ -81,9 +77,6 @@ contract E2EDisputeCourt is Test {
     
     DisputeCourt.DisputeStatus status = disputeCourt.disputes(disputeId).status;
     vm.assertEqual(uint(status), uint(DisputeCourt.DisputeStatus.Resolved), "The dispute should be resolved");
-*/
-}
-
-
-  
+    */
+  }
 }
