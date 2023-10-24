@@ -1,0 +1,3 @@
+[submodule "contracts/lib/dev-quickstart-oov3"]
+	path = contracts/lib/dev-quickstart-oov3
+	url = https://github.com/UMAprotocol/dev-quickstart-oov3

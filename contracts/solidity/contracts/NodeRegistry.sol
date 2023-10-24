@@ -12,7 +12,7 @@ contract NodeRegistry is Ownable, INodeRegistry {
 
   event NodeDeregistered(address indexed _node);
 
-  constructor(address _initialOwner) Ownable(_initialOwner) {}
+  constructor(address _initialOwner) Ownable() {}
 
   function isActive(address _node) external view override returns (bool _isActive) {
     return _activeNodes[_node];

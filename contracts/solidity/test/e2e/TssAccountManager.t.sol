@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {TssAccountManager} from '../../contracts/TssAccountManager.sol';
 import {NodeRegistryMock} from '../utils/NodeRegistryMock.sol';
-import {MessageHashUtils} from '@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol';
+import {MessageHashUtils} from 'openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol';
 import {Test} from 'forge-std/Test.sol';
 
 contract E2ETssAccountManagerTest is Test {

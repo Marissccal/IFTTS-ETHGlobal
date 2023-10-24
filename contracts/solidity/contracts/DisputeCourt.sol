@@ -3,12 +3,15 @@ pragma solidity ^0.8.0;
 
 import {ITssAccountManager} from '../interfaces/ITssAccountManager.sol';
 import {ECDSA} from '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
-import {MessageHashUtils} from '@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol';
+import {OptimisticOracleV3Interface} from
+  '@uma/core/contracts/optimistic-oracle-v3/interfaces/OptimisticOracleV3Interface.sol'; // Cambiamos la ruta a la interfaz
+import {Facts} from './Facts.sol';
 
 contract DisputeCourt {
-  uint40 public constant DISPUTE_RESOLUTION_TIME = 7 days;
+  uint64 public constant DISPUTE_RESOLUTION_TIME = 7 days;
 
   ITssAccountManager public immutable ACCOUNT_MGR;
+  OptimisticOracleV3Interface public immutable ACCOUNT_ORACLE;
 
   enum DisputeType {
     invalid,
@@ -23,12 +26,23 @@ contract DisputeCourt {
     Rejected // This state is when the dispute was rejected (before deadline)
   }
 
+  enum OracleStatus {
+    NotRequested,
+    Requested,
+    Resolved
+  }
+
   struct Dispute {
     address complainant; // Address of the user who raised the dispute
     bytes32 accountId; // Id of the account in question
     DisputeType disputeType; // Reason for the dispute
     DisputeStatus status; // Status of the dispute
-    uint40 deadline; // Deadline until the dispute can be challenged
+    uint64 deadline; // Deadline until the dispute can be challenged
+  }
+
+  struct OracleRequest {
+    OracleStatus status;
+    uint64 deadline;
   }
 
   Dispute[] public disputes;
@@ -39,6 +53,8 @@ contract DisputeCourt {
 
   mapping(uint256 => NonExistentRuleDispute) internal _nonExistentRuleDisputes;
 
+  mapping(uint256 => OracleRequest) public oracleRequests;
+
   event DisputeRaised(
     uint256 indexed _disputeId, address indexed _complainant, bytes32 indexed _accountId, DisputeType _disputeType
   );
@@ -47,8 +63,9 @@ contract DisputeCourt {
 
   event NonExistentRuleDisputeRaised(uint256 indexed _disputeId, bytes _message);
 
-  constructor(ITssAccountManager _tssAccountManager) {
+  constructor(ITssAccountManager _tssAccountManager, OptimisticOracleV3Interface _optimisticOracleV3Address) {
     ACCOUNT_MGR = _tssAccountManager;
+    ACCOUNT_ORACLE = _optimisticOracleV3Address;
   }
 
   function _raiseDispute(bytes32 _accountId, DisputeType _disputeType) internal returns (uint256 _disputeId) {
@@ -57,13 +74,12 @@ contract DisputeCourt {
       accountId: _accountId,
       disputeType: _disputeType,
       status: DisputeStatus.Open,
-      deadline: uint40(block.timestamp) + DISPUTE_RESOLUTION_TIME
+      deadline: uint64(block.timestamp) + DISPUTE_RESOLUTION_TIME
     });
 
     disputes.push(_newDispute);
     _disputeId = disputes.length - 1;
     emit DisputeRaised(_disputeId, msg.sender, _accountId, _disputeType);
-    return _disputeId;
   }
 
   function raiseNonExistentRuleDispute(
@@ -75,7 +91,7 @@ contract DisputeCourt {
   ) external returns (uint256 _disputeId) {
     address _publicAddress = ACCOUNT_MGR.getPublicAddress(_accountId);
     require(_publicAddress != address(0), 'DisputeCourt: account inactive');
-    bytes32 _messageHash = MessageHashUtils.toEthSignedMessageHash(_message);
+    bytes32 _messageHash = ECDSA.toEthSignedMessageHash(_message);
     address _recoveredSigner = ECDSA.recover(_messageHash, _v, _r, _s);
     require(_publicAddress == _recoveredSigner, 'DisputeCourt: message not signed');
     _disputeId = _raiseDispute(_accountId, DisputeType.sigOfNonExistentRule);
@@ -87,8 +103,42 @@ contract DisputeCourt {
     // Add multisignature exucution??
     require(disputes[_disputeId].status == DisputeStatus.Open, 'Dispute is not open');
     require(disputes[_disputeId].deadline <= block.timestamp, 'Dispute is still challengeable');
-    disputes[_disputeId].status = DisputeStatus.Resolved;
-    emit DisputeResolved(_disputeId);
+    require(oracleRequests[_disputeId].deadline <= block.timestamp, 'Oracle result is still challengeable');
+
+    bool _result = ACCOUNT_ORACLE.settleAndGetAssertionResult(keccak256(abi.encodePacked(_disputeId)));
+    if (_result) {
+      disputes[_disputeId].status = DisputeStatus.Resolved;
+      emit DisputeResolved(_disputeId);
+    } else {
+      disputes[_disputeId].status = DisputeStatus.Rejected;
+      emit DisputeRejected(_disputeId);
+    }
+
+    oracleRequests[_disputeId].status = OracleStatus.Resolved;
+  }
+
+  function resolveFalseFactDispute(
+    bytes32 _accountId,
+    uint256 _ruleIndex,
+    Facts.Fact[] memory _facts
+  ) external returns (uint256 _disputeId) {
+    require(msg.sender == address(ACCOUNT_MGR), 'DisputeCourt: Only TssAccountManager can resolve false facts');
+
+    require(_accountId != bytes32(0), 'DisputeCourt: Invalid accountId');
+    require(_nonExistentRuleDisputes[_ruleIndex].message.length > 0, 'DisputeCourt: Invalid ruleIndex');
+
+    bytes[] memory _messages = ACCOUNT_MGR.messagesToSignFromFacts(_accountId, _ruleIndex, _facts);
+    for (uint256 _i = 0; _i < _messages.length; _i++) {
+      require(_messages[_i].length == 0, 'DisputeCourt: Fact is not false');
+    }
+
+    _disputeId = _raiseDispute(_accountId, DisputeType.sigOfFalseFact);
+
+    ACCOUNT_ORACLE.getAssertionResult(keccak256(abi.encodePacked(_disputeId)));
+    oracleRequests[_disputeId] =
+      OracleRequest({status: OracleStatus.Requested, deadline: uint64(block.timestamp) + DISPUTE_RESOLUTION_TIME});
+
+    return _disputeId;
   }
 
   function rejectDispute(uint256 _disputeId) public {
